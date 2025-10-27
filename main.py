@@ -11,6 +11,14 @@ import jwt
 from passlib.context import CryptContext
 import enum
 import os
+from zoneinfo import ZoneInfo  # ✅ Importar para manejo de zonas horarias
+
+# ✅ Configurar zona horaria de Colombia
+TIMEZONE = ZoneInfo("America/Bogota")
+
+def get_local_now():
+    """Obtiene la fecha y hora actual en la zona horaria de Colombia"""
+    return datetime.now(TIMEZONE)
 
 # Configuración
 SECRET_KEY = os.getenv("SECRET_KEY", "tu-clave-secreta-muy-segura-cambiala-en-produccion")
@@ -36,6 +44,8 @@ class UserRole(str, enum.Enum):
 class PaymentMethod(str, enum.Enum):
     CASH = "cash"
     CARD = "card"
+    NEQUI = "nequi"
+    DAVIPLATA = "daviplata"
     TRANSFER = "transfer"
 
 # Models
@@ -48,7 +58,7 @@ class User(Base):
     full_name = Column(String)
     role = Column(SQLEnum(UserRole), default=UserRole.CASHIER)
     is_active = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=get_local_now)  # ✅ Usar zona horaria local
 
 class Category(Base):
     __tablename__ = "categories"
@@ -69,7 +79,7 @@ class Product(Base):
     category_id = Column(Integer, ForeignKey("categories.id"))
     image_url = Column(String, nullable=True)
     is_active = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=get_local_now)  # ✅ Usar zona horaria local
     category = relationship("Category", back_populates="products")
 
 class Sale(Base):
@@ -84,7 +94,7 @@ class Sale(Base):
     customer_name = Column(String, nullable=True)
     customer_email = Column(String, nullable=True)
     notes = Column(String, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=get_local_now)  # ✅ Usar zona horaria local
     items = relationship("SaleItem", back_populates="sale")
     user = relationship("User")
 
@@ -98,6 +108,14 @@ class SaleItem(Base):
     subtotal = Column(Float)
     sale = relationship("Sale", back_populates="items")
     product = relationship("Product")
+
+class UserSimple(BaseModel):
+    id: int
+    username: str
+    full_name: Optional[str]
+
+    class Config:
+        from_attributes = True
 
 # Create tables
 Base.metadata.create_all(bind=engine)
@@ -206,7 +224,6 @@ class SaleItemResponse(BaseModel):
 
 class SaleResponse(BaseModel):
     id: int
-    user_id: int
     total: float
     subtotal: float
     tax: float
@@ -216,6 +233,7 @@ class SaleResponse(BaseModel):
     customer_email: Optional[str]
     notes: Optional[str]
     created_at: datetime
+    user: Optional[UserSimple]
     items: List[SaleItemResponse]
 
     class Config:
@@ -245,12 +263,13 @@ def get_db():
 def verify_password(plain_password, hashed_password):
     return pwd_context.verify(plain_password, hashed_password)
 
-def get_password_hash(password):
+def get_password_hash(password: str):
+    password = password[:72]
     return pwd_context.hash(password)
 
 def create_access_token(data: dict):
     to_encode = data.copy()
-    expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    expire = get_local_now() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)  # ✅ Usar zona horaria local
     to_encode.update({"exp": expire})
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
@@ -419,7 +438,7 @@ def create_sale(sale: SaleCreate, db: Session = Depends(get_db), current_user: U
         subtotal += item.price * item.quantity
     
     # Calculate totals
-    tax = subtotal * 0.19  # 19% IVA (ajustar según país)
+    tax = subtotal * 0.19  # 19% IVA
     total = subtotal + tax - sale.discount
     
     # Create sale
@@ -456,22 +475,49 @@ def create_sale(sale: SaleCreate, db: Session = Depends(get_db), current_user: U
     db.refresh(new_sale)
     return new_sale
 
+from sqlalchemy.orm import joinedload
+
 @app.get("/sales", response_model=List[SaleResponse])
 def get_sales(
     skip: int = 0,
     limit: int = 100,
     start_date: Optional[datetime] = None,
     end_date: Optional[datetime] = None,
+    today: bool = False,
+    summary: bool = False,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    query = db.query(Sale)
-    
+    query = db.query(Sale).options(
+        joinedload(Sale.user),
+        joinedload(Sale.items).joinedload(SaleItem.product).joinedload(Product.category)
+    )
+
+    # ✅ Filtrar por fecha si el frontend manda start_date o end_date
     if start_date:
         query = query.filter(Sale.created_at >= start_date)
     if end_date:
         query = query.filter(Sale.created_at <= end_date)
-    
+
+    # ✅ Si el frontend pide las ventas del día actual
+    if today:
+        today_date = get_local_now().date()
+        start_of_day = datetime.combine(today_date, datetime.min.time()).replace(tzinfo=TIMEZONE)
+        end_of_day = datetime.combine(today_date, datetime.max.time()).replace(tzinfo=TIMEZONE)
+        query = query.filter(Sale.created_at >= start_of_day, Sale.created_at <= end_of_day)
+
+    # ✅ Si el frontend solo quiere el resumen del día
+    if summary:
+        today_date = get_local_now().date()
+        start_of_day = datetime.combine(today_date, datetime.min.time()).replace(tzinfo=TIMEZONE)
+        end_of_day = datetime.combine(today_date, datetime.max.time()).replace(tzinfo=TIMEZONE)
+
+        sales = query.filter(Sale.created_at >= start_of_day, Sale.created_at <= end_of_day).all()
+        total = sum(s.total for s in sales)
+        count = len(sales)
+        return {"total": total, "count": count}
+
+    # ✅ Devolver la lista de ventas normal
     return query.order_by(Sale.created_at.desc()).offset(skip).limit(limit).all()
 
 @app.get("/sales/{sale_id}", response_model=SaleResponse)
@@ -481,14 +527,16 @@ def get_sale(sale_id: int, db: Session = Depends(get_db), current_user: User = D
         raise HTTPException(status_code=404, detail="Sale not found")
     return sale
 
+from datetime import date
+
 # Dashboard stats
 @app.get("/dashboard/stats")
 def get_dashboard_stats(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    today = datetime.utcnow().date()
+    today_date = get_local_now().date()  # ✅ Usar zona horaria local
     
     # Today's sales
     today_sales = db.query(Sale).filter(
-        Sale.created_at >= datetime.combine(today, datetime.min.time())
+        Sale.created_at >= datetime.combine(today_date, datetime.min.time()).replace(tzinfo=TIMEZONE)
     ).all()
     
     today_revenue = sum(sale.total for sale in today_sales)
