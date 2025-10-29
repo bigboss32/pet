@@ -30,14 +30,14 @@ def create_sale(
         subtotal += item.price * item.quantity
     
     # Calcular totales
-    tax = subtotal * 0.19  # 19% IVA
-    total = subtotal + tax - sale.discount
+
+    total = subtotal - sale.discount
     
     # Crear venta
     new_sale = Sale(
         user_id=current_user.id,
         subtotal=subtotal,
-        tax=tax,
+        tax=0,
         discount=sale.discount,
         total=total,
         payment_method=sale.payment_method,
