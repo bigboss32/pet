@@ -13,7 +13,7 @@ class ProductBase(BaseModel):
     image_url: Optional[str] = None
 
 class ProductCreate(ProductBase):
-    pass
+    image_base64: Optional[str] = None
 
 class ProductUpdate(BaseModel):
     name: Optional[str] = None
@@ -29,7 +29,7 @@ class ProductUpdate(BaseModel):
 class ProductResponse(ProductBase):
     id: int
     is_active: bool
-    created_at: datetime
+    image_base64: Optional[str] = None
     
     class Config:
         from_attributes = True

@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Float, Boolean, DateTime, ForeignKey
+from sqlalchemy import Column, Integer, String, Float, Boolean, DateTime, ForeignKey,Text
 from sqlalchemy.orm import relationship
 from database import Base
 from utils import get_local_now
@@ -14,8 +14,7 @@ class Product(Base):
     stock = Column(Integer, default=0)
     barcode = Column(String, unique=True)
     category_id = Column(Integer, ForeignKey("categories.id"))
-    image_url = Column(String)
+    image_base64 = Column(Text, nullable=True)
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=get_local_now)
-    
     category = relationship("Category", back_populates="products")
