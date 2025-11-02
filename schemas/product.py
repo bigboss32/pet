@@ -9,6 +9,7 @@ class ProductBase(BaseModel):
     cost: float = Field(ge=0, default=0)
     stock: int = Field(ge=0, default=0)
     barcode: Optional[str] = None
+    unidad_medida: Optional[str] = None
     category_id: int
     image_url: Optional[str] = None
 

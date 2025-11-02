@@ -21,6 +21,7 @@ async def create_product(
     category_id: int = Form(...),
     description: Optional[str] = Form(None),
     barcode: Optional[str] = Form(None),
+    unidad_medida: Optional[str] = Form(None),
     image: Optional[UploadFile] = File(None),
     db: Session = Depends(get_db), 
     current_user: User = Depends(get_current_user)
@@ -50,7 +51,8 @@ async def create_product(
         stock=stock,
         barcode=barcode,
         category_id=category_id,
-        image_base64=image_base64
+        image_base64=image_base64,
+        unidad_medida=unidad_medida  # 👈 ESTO FALTABA
     )
 
     db.add(new_product)
@@ -106,8 +108,7 @@ def get_product(
 
     return product
 
-
-# ✅ ACTUALIZAR PRODUCTO (incluye cambio de imagen)
+# ✅ ACTUALIZAR PRODUCTO (COMPLETO CON unidad_medida)
 @router.put("/{product_id}", response_model=ProductResponse)
 async def update_product(
     product_id: int,
@@ -115,6 +116,7 @@ async def update_product(
     price: Optional[float] = Form(None),
     cost: Optional[float] = Form(None),
     stock: Optional[int] = Form(None),
+    unidad_medida: Optional[str] = Form(None),  # 👈 AGREGAR ESTE PARÁMETRO
     category_id: Optional[int] = Form(None),
     description: Optional[str] = Form(None),
     barcode: Optional[str] = Form(None),
@@ -140,6 +142,8 @@ async def update_product(
         product.cost = cost
     if stock is not None:
         product.stock = stock
+    if unidad_medida is not None:  # 👈 AGREGAR ESTA ACTUALIZACIÓN
+        product.unidad_medida = unidad_medida
     if category_id is not None:
         product.category_id = category_id
     if description is not None:
@@ -154,7 +158,6 @@ async def update_product(
     db.commit()
     db.refresh(product)
     return product
-
 
 # ✅ ELIMINAR (DESACTIVAR) PRODUCTO
 @router.delete("/{product_id}", status_code=status.HTTP_204_NO_CONTENT)

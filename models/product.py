@@ -15,6 +15,7 @@ class Product(Base):
     barcode = Column(String, unique=True)
     category_id = Column(Integer, ForeignKey("categories.id"))
     image_base64 = Column(Text, nullable=True)
+    unidad_medida = Column(Text, nullable=True)
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=get_local_now)
     category = relationship("Category", back_populates="products")
