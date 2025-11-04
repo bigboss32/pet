@@ -99,17 +99,17 @@ def main():
     print()
     
     admin = create_user(
-        email="admin@petshop.com",
-        username="admin",
-        password="admin123",
+        email="mascotasdeimpacto@gmail.com",
+        username="DanielPI",
+        password="Admin1234",
         full_name="Administrador",
         role="admin"
     )
     
     cashier = create_user(
         email="cajero@petshop.com",
-        username="cajero",
-        password="cajero123",
+        username="vendedor",
+        password="Vendedor1234",
         full_name="Cajero Principal",
         role="cashier"
     )
@@ -123,7 +123,7 @@ def main():
     # 2. Login para obtener token
     print("🔑 Iniciando sesión con admin...")
     print()
-    token = login("admin", "admin123")
+    token = login("DanielPI", "Admin1234")
     
     if not token:
         print("❌ No se pudo iniciar sesión")

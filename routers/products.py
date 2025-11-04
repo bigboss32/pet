@@ -65,7 +65,7 @@ async def create_product(
 @router.get("/", response_model=List[ProductResponse])
 def get_products(
     skip: int = 0,
-    limit: int = 100,
+    limit: int = 9999999,
     search: Optional[str] = None,
     category_id: Optional[int] = None,
     is_active: Optional[bool] = True,
